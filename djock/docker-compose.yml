@@ -1,0 +1,136 @@
+version: '3'
+
+networks:
+  frontend:
+    driver: ${NETWORKS_DRIVER}
+  backend:
+    driver: ${NETWORKS_DRIVER}
+
+volumes:
+  postgres:
+    driver: ${VOLUMES_DRIVER}
+  redis:
+    driver: ${VOLUMES_DRIVER}
+
+
+
+
+services:
+
+### Workspace Utilities ##################################
+    workspace:
+      build:
+        context: ./workspace
+        args:
+          - INSTALL_DJANGO=${WORKSPACE_INSTALL_DJANGO}
+      volumes:
+        - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}${APP_CODE_CONTAINER_FLAG}
+      extra_hosts:
+        - "dockerhost:${DOCKER_HOST_IP}"
+      ports:
+        - "${WORKSPACE_SSH_PORT}:22"
+      tty: true
+      environment:
+        - DOCKER_HOST=tcp://docker-in-docker:2375
+      networks:
+        - frontend
+        - backend
+      links:
+        - docker-in-docker
+
+    application:
+      build:
+        context: ./application
+        args:
+          - INSTALL_DJANGO=${APPLICATION_INSTALL_DJANGO}
+      volumes:
+        - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}${APP_CODE_CONTAINER_FLAG}
+      extra_hosts:
+        - "dockerhost:${DOCKER_HOST_IP}"
+      ports:
+        - "${APPLICATION_SSH_PORT}:22"
+        - "${APPLICATION_HTTP_PORT}:8000"
+      tty: true
+      environment:
+        - DOCKER_HOST=tcp://docker-in-docker:2375
+        - DB_NAME=${APPLICATION_DB_NAME}
+        - DB_USERNAME=${APPLICATION_DB_USERNAME}
+        - DB_PASSWORD=${APPLICATION_DB_PASSWORD}
+        - DB_HOST=${APPLICATION_DB_HOST}
+        - DB_PORT=${APPLICATION_DB_PORT}
+        - CELERY_BROKER=redis://redis:6379/0
+      networks:
+        - frontend
+        - backend
+      links:
+        - docker-in-docker
+        - ${APPLICATION_DB_HOST}
+        - redis
+
+    celery:
+      build:
+        context: ./application
+        args:
+          - INSTALL_DJANGO=${APPLICATION_INSTALL_DJANGO}
+      volumes:
+        - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}${APP_CODE_CONTAINER_FLAG}
+      extra_hosts:
+        - "dockerhost:${DOCKER_HOST_IP}"
+      tty: true
+      environment:
+        - DOCKER_HOST=tcp://docker-in-docker:2375
+        - DB_NAME=${APPLICATION_DB_NAME}
+        - DB_USERNAME=${APPLICATION_DB_USERNAME}
+        - DB_PASSWORD=${APPLICATION_DB_PASSWORD}
+        - DB_HOST=${APPLICATION_DB_HOST}
+        - DB_PORT=${APPLICATION_DB_PORT}
+        - CELERY_BROKER=redis://redis:6379/0
+        - SCRAPY_SETTINGS_MODULE=crawler_scrapy.crawler_scrapy.settings
+        - PYTHONPATH=/app
+      entrypoint:
+        - "/bin/bash"
+        - "/script/entrypoint_celery.sh"
+      networks:
+        - backend
+      links:
+        - docker-in-docker
+        - ${APPLICATION_DB_HOST}
+        - redis
+
+  ### Needs  pip3 install -U docker-pycreds
+  ### PostgreSQL ###########################################
+    postgres:
+      build:
+        context: ./postgres
+      volumes:
+        - ${DATA_PATH_HOST}/postgres:/var/lib/postgresql/data
+        - ${POSTGRES_ENTRYPOINT_INITDB}:/docker-entrypoint-initdb.d
+      ports:
+        - "${POSTGRES_PORT}:5432"
+      environment:
+        - POSTGRES_DB=${POSTGRES_DB}
+        - POSTGRES_USER=${POSTGRES_USER}
+        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      networks:
+        - backend
+
+  ### Redis ################################################
+    redis:
+      build: ./redis
+      volumes:
+        - ${DATA_PATH_HOST}/redis:/data
+      ports:
+        - "${REDIS_PORT}:6379"
+      networks:
+        - backend
+
+### Docker-in-Docker ################################################
+    docker-in-docker:
+      image: docker:dind
+      privileged: true
+      volumes:
+        - ${APP_CODE_PATH_HOST}:${APP_CODE_PATH_CONTAINER}
+      expose:
+        - 2375
+      networks:
+        - backend

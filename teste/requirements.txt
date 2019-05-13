@@ -1,0 +1,8 @@
+Django==2.2.1
+psycopg2>=2.8
+django-crispy-forms>=1.0
+celery>=4.3
+redis>=3
+scrapy>=1.6.0
+google-auth-oauthlib>=0.3.0
+pyasn1-modules>=0.2.5

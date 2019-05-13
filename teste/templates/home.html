@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="container">
+  <div class="row">
+    <div class="col-sm-4">
+
+
+      <form action="{% url 'Home' %}" method="post">
+        {% csrf_token %}
+        <div class="form-row">
+          <div class="form-group col-md-12">
+            {{ form.ean|as_crispy_field }}
+          </div>
+        </div>
+        <div class="form-row">
+         <button type="submit" class="btn btn-primary">Enviar</button>
+        </div>
+      </form>
+    </div>
+
+
+    <div class="col-sm-8">
+      {{ produto }}
+    </div>
+  </div>
+</div>
+{% endblock %}
