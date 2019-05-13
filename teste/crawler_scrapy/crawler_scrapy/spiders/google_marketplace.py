@@ -23,7 +23,10 @@ class GoogleMarketplaceSpider(scrapy.Spider):
         for selector in a_selectors:
             text = ''.join(selector.xpath("text()").extract()).strip()
             link =  selector.xpath("@href").extract_first()
-            yield {"tipo": "busca", "product": text, 'link': 'https://' + self.allowed_domains[0] + link, 'ean': self.ean}
+            if link[:22] != 'https://www.google.com':
+                link = 'https://' + self.allowed_domains[0] + link 
+
+            yield {"tipo": "busca", "produto": text, 'link': link, 'ean': self.ean}
 
 
 class ProdutoMPSpider(scrapy.Spider):
@@ -40,18 +43,14 @@ class ProdutoMPSpider(scrapy.Spider):
             yield self.make_requests_from_url(url)
 
     def parse(self, response):
-        print(response.body)
         title = response.xpath('//h1[@id="product-name"]/text()').extract()
         url_lojas = response.xpath('//a[contains(@class, \'pag-detail-link\')]/@href').getall()
         url_imagem = response.xpath('//img[contains(@class, \'TL92Hc\')]/@src').extract_first()
 
-        yield {"tipo": "loja", "title": title, "url_image": url_imagem, "url_lojas": url_lojas[0], "ean": self.ean}
+        if url_lojas[0][:22] != 'https://www.google.com':
+                url_lojas[0] = 'https://' + self.allowed_domains[0] + url_lojas[0]
 
-        # a_selectors = response.xpath('//*[contains(@class, \'MCpGKc\')]/h3/a')
-        # for selector in a_selectors:
-        #     text = ''.join(selector.xpath("text()").extract()).strip()
-        #     link =  selector.xpath("@href").extract_first()
-        #     yield {"tipo": "produto", "product": text, 'link': 'https://' + self.allowed_domains[0] + link}
+        yield {"tipo": "produto", "title": title, "url_imagem": url_imagem, "url_lojas": url_lojas[0], "ean": self.ean, 'url': self.url}
 
 
 class LojasMPSpider(scrapy.Spider):
@@ -69,11 +68,15 @@ class LojasMPSpider(scrapy.Spider):
 
     def parse(self, response):
 
-        a_selectors = response.xpath('//*[contains(@class, \'MCpGKc\')]/h3/a')
+        a_selectors = response.xpath('//*[contains(@class, \'os-row\')]/h3/a')
         for selector in a_selectors:
-            text = ''.join(selector.xpath("text()").extract()).strip()
-            link =  selector.xpath("@href").extract_first()
-            yield {"tipo": "loja", "product": text, 'link': self.allowed_domains[0] + link}
+            seller = ''.join(selector.xpath("//*[contains(@class, \'os-seller-name-primary\')]/text()").extract()).strip()
+            payment = ''.join(selector.xpath("//*[contains(@class, \'os-details-col\')]/text()").extract()).strip()
+            total = ''.join(selector.xpath("//*[contains(@class, \'os-price-col\')]/text()").extract()).strip()  # os-price-col
+            payment = payment.split("x")
+
+
+            yield {"tipo": "loja", "product": text, 'link': self.allowed_domains[0] + link, 'parcela': payment[0], 'valor_parcela': payment[1], 'total':total, 'id': self.id}
 
 
 

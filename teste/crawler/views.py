@@ -22,6 +22,13 @@ class Home(View):
             'form': form,
             'produto' : 123
         }
+        item = {
+                'ean': '100',
+                'url_imagem': 1
+        }
+
+
+
         return render(request, self.template_name, context)
 
     def post(self, request, *args, **kwargs):
